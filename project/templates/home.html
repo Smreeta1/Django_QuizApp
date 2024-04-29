@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz App</title>
+</head>
+<body>
+    <h1>Welcome to the Quiz App</h1>
+
+    <!-- Display available courses -->
+    <div id="courses-list">
+        <h2>Available Courses:</h2>
+        <ul id="courses">
+            <!-- Courses will be populated dynamically using JavaScript -->
+        </ul>
+    </div>
+
+    <!-- Display quiz questions -->
+    <div id="quiz" style="display: none;">
+        <h2>Quiz Questions</h2>
+        <div id="questions"></div>
+        <button id="submit">Submit Answers</button>
+    </div>
+
+    <!-- Display quiz results -->
+    <div id="results" style="display: none;">
+        <h2>Quiz Results</h2>
+        <p id="score"></p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Fetch available courses
+            fetch('/api/courses/')
+                .then(response => response.json())
+                .then(data => {
+                    const coursesList = document.getElementById('courses');
+                    data.forEach(course => {
+                        const listItem = document.createElement('li');
+                        listItem.textContent = course.course_name;
+                        listItem.addEventListener('click', () => startQuiz(course.id));
+                        coursesList.appendChild(listItem);
+                    });
+                });
+
+            // Function to start quiz for a selected course
+            function startQuiz(courseId) {
+                // Fetch quiz questions for the selected course
+                fetch(`/api/question/${courseId}/`)
+                    .then(response => response.json())
+                    .then(questions => {
+                        const quizContainer = document.getElementById('questions');
+                        quizContainer.innerHTML = ''; // Clear previous questions
+                        questions.forEach(question => {
+                            const questionElement = document.createElement('div');
+                            questionElement.innerHTML = `
+                                <p>${question.question}</p>
+                                <ul>
+                                    <li><input type="radio" name="question_${question.id}" value="option_one">${question.option_one}</li>
+                                    <li><input type="radio" name="question_${question.id}" value="option_two">${question.option_two}</li>
+                                    <!-- Add more options dynamically if needed -->
+                                </ul>
+                            `;
+                            quizContainer.appendChild(questionElement);
+                        });
+                        // Show the quiz section
+                        document.getElementById('quiz').style.display = 'block';
+                    });
+            }
+
+            // Submit quiz answers
+            document.getElementById('submit').addEventListener('click', function() {
+                const formData = {};
+                const quizQuestions = document.querySelectorAll('#questions div');
+                quizQuestions.forEach(question => {
+                    const questionId = question.id.split('_')[1];
+                    const selectedOption = document.querySelector(`input[name="question_${questionId}"]:checked`);
+                    if (selectedOption) {
+                        formData[questionId] = selectedOption.value;
+                    }
+                });
+
+                // Send quiz answers to the backend
+                fetch('/api/check_score/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'  // Include CSRF token if needed
+                    },
+                    body: JSON.stringify({
+                        course_id: selectedCourseId,
+                        data: formData
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Display quiz results
+                    document.getElementById('quiz').style.display = 'none';
+                    document.getElementById('results').style.display = 'block';
+                    document.getElementById('score').textContent = `Your score: ${data.score}`;
+                })
+                .catch(error => {
+                    console.error('Error submitting quiz:', error);
+                    alert('Failed to submit quiz. Please try again.');
+                });
+            });
+        });
+    </script>
+</body>
+</html>
